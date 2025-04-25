@@ -44,7 +44,7 @@ global.SupportGroupLink = "https://chat.whatsapp.com/Jo9QobvI8Ge2LdFVNL6Mlp";
 
 
 //
-global.openAiAPI = process.env.OPENAI_API || "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";
+global.openAiAPI = process.env.OPENAI_API || "";
 global.location = process.env.LOCATION || "Center Java, Indonesia";
 global.reactmoji = process.env.REACT_MOJI || "❤️";
 global.themeemoji = process.env.THEME_EMOJI || "💖";
