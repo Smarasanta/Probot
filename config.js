@@ -41,7 +41,10 @@ global.packname = process.env.PACK_NAME || "SPS Bot";
 global.author = "By: SPS";
 global.BotSourceCode = "https://github.com/Diah082/Nebot";
 global.SupportGroupLink = "https://chat.whatsapp.com/Jo9QobvI8Ge2LdFVNL6Mlp";
-
+global.GroupLink = "https://chat.whatsapp.com/Jo9QobvI8Ge2LdFVNL6Mlp";
+global.Qris = "https://h.uguu.se/BcYJmeNf.jpg";
+global.Email = "newbiestore09@gmail.com"; // Ganti dengan email kamu
+global.Pass = "Elma1234!!"; // Ganti dengan password kamu
 
 /
 global.location = process.env.LOCATION || "Center Java, Indonesia";
@@ -52,7 +55,7 @@ global.vidmenu = { url: process.env.VID_MENU_URL || 'https://telegra.ph/file/ae1
 
 //
 global.BotLogo = fs.readFileSync("./Assets/pic1.jpg");
-global.Thumb = fs.readFileSync("./Assets/Sabdo.jpg");
+global.Thumb = "https://f.uguu.se/NUKLzsGL.jpg";
 global.Thumb1 = fs.readFileSync("./Assets/pic5.jpg");
 global.ErrorPic = fs.readFileSync("./Assets/pic7.jpg");
 global.them = "https://r4.wallpaperflare.com/wallpaper/1003/376/845/makoto-shinkai-kimi-no-na-wa-wallpaper-0816ade8b0301c58302c014e48d2441a.jpg";

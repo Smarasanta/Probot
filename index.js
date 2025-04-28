@@ -93,27 +93,29 @@ const startA17  = async () => {
       printQRInTerminal: !pairingMode,
       browser: ["Windows", "Chrome", "114.0.0.0"],
       auth: state,
-      patchMessageBeforeSending: (message) => {
-        const requiresPatch = !!(
-          message.buttonsMessage
-          || message.templateMessage
-          || message.listMessage
-        );
-        if (requiresPatch) {
-          message = {
-            viewOnceMessage: {
-              message: {
-                messageContextInfo: {
-                  deviceListMetadataVersion: 2,
-                  deviceListMetadata: {},
-                },
-                ...message,
-              },
-            },
-          };
-        }
-        return message;
-      },
+		patchMessageBeforeSending: (message) => {
+		  const requiresPatch = !!(
+			message.buttonsMessage
+			|| message.templateMessage
+			|| message.listMessage
+			|| message.interactiveMessage // ini penting
+		  );
+		  if (requiresPatch) {
+			message = {
+			  viewOnceMessage: {
+				message: {
+				  messageContextInfo: {
+					deviceListMetadataVersion: 2,
+					deviceListMetadata: {},
+				  },
+				  ...message,
+				},
+			  },
+			};
+		  }
+		  return message;
+		},
+
     });
 
     store.bind(A17.ev);
@@ -265,78 +267,97 @@ A17.ev.on("messages.upsert", async (chatUpdate) => {
     if (!A17.public && !mek.key.fromMe && !isOwner && chatUpdate.type === "notify") return;
     if (mek.key.id.startsWith("BAE5") && mek.key.id.length === 16) return;
 
-    // ======== ANTI LINK HANDLER ========
-    const fs = require("fs");
-    const path = require("path");
-    const groupDbPath = path.join(__dirname, "./database/group.json");
-    const antilinkLogPath = path.join(__dirname, "./database/antilinklog.json");
+// ======== ANTI LINK HANDLER (DAILY LIMIT) ========
+const fs = require("fs");
+const path = require("path");
+const groupDbPath = path.join(__dirname, "./database/group.json");
+const antilinkLogPath = path.join(__dirname, "./database/antilinklog.json");
 
-    const loadJson = (filepath) => {
-      if (!fs.existsSync(filepath)) return {};
-      try {
+const loadJson = (filepath) => {
+    if (!fs.existsSync(filepath)) return {};
+    try {
         return JSON.parse(fs.readFileSync(filepath));
-      } catch {
+    } catch {
         return {};
-      }
-    };
-    const saveJson = (filepath, data) => {
-      fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
-    };
+    }
+};
+const saveJson = (filepath, data) => {
+    fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+};
 
-    const linkPatterns = {
-      yt: /(?:youtu\.be|youtube\.com)/i,
-      wa: /(?:wa\.me|chat\.whatsapp\.com)/i,
-      tele: /t\.me\//i,
-      tiktok: /tiktok\.com/i,
-      twitter: /twitter\.com/i,
-      ig: /(?:instagram\.com|ig\.me)/i,
-      fb: /facebook\.com/i,
-      unknown: /https?:\/\/(?!.*(youtube|wa\.me|whatsapp|t\.me|tiktok|twitter|instagram|facebook))/i
-    };
+// Reset harian (optional, but recommended)
+const today = new Date().toISOString().slice(0, 10); // format YYYY-MM-DD
 
-    if (mek.key.remoteJid.endsWith("@g.us") && mek.message) {
-      const groupData = loadJson(groupDbPath);
-      const groupSetting = groupData[mek.key.remoteJid]?.antilink;
+const linkPatterns = {
+    yt: /(?:youtu\.be|youtube\.com)/i,
+    wa: /(?:wa\.me|chat\.whatsapp\.com)/i,
+    tele: /t\.me\//i,
+    tiktok: /tiktok\.com/i,
+    twitter: /twitter\.com/i,
+    ig: /(?:instagram\.com|ig\.me)/i,
+    fb: /facebook\.com/i,
+    unknown: /https?:\/\/(?!.*(youtube|wa\.me|whatsapp|t\.me|tiktok|twitter|instagram|facebook))/i
+};
 
-      if (groupSetting) {
+if (mek.key.remoteJid.endsWith("@g.us") && mek.message) {
+    const groupData = loadJson(groupDbPath);
+    const groupSetting = groupData[mek.key.remoteJid]?.antilink;
+
+    if (groupSetting) {
         const messageContent = mek.message?.conversation || mek.message?.extendedTextMessage?.text || '';
 
         const metadata = await A17.groupMetadata(mek.key.remoteJid);
         const groupAdmins = metadata.participants.filter(p => p.admin).map(p => p.id);
 
         if (!groupAdmins.includes(mek.key.participant) && !mek.key.fromMe) {
-          for (let [type, pattern] of Object.entries(linkPatterns)) {
-            if (groupSetting[type] && pattern.test(messageContent)) {
-              try {
-                await A17.sendMessage(mek.key.remoteJid, { delete: mek.key });
-                console.log(`[ANTILINK] Hapus link ${type} dari ${mek.key.participant}`);
+            for (let [type, pattern] of Object.entries(linkPatterns)) {
+                if (groupSetting[type] && pattern.test(messageContent)) {
+                    try {
+                        let log = loadJson(antilinkLogPath);
+                        if (!log[today]) log[today] = {}; // create log per hari
+                        if (!log[today][mek.key.remoteJid]) log[today][mek.key.remoteJid] = {};
+                        if (!log[today][mek.key.remoteJid][mek.key.participant]) log[today][mek.key.remoteJid][mek.key.participant] = 0;
 
-                let log = loadJson(antilinkLogPath);
-                if (!log[mek.key.remoteJid]) log[mek.key.remoteJid] = {};
-                if (!log[mek.key.remoteJid][mek.key.participant]) log[mek.key.remoteJid][mek.key.participant] = 0;
-                log[mek.key.remoteJid][mek.key.participant] += 1;
-                saveJson(antilinkLogPath, log);
+                        log[today][mek.key.remoteJid][mek.key.participant] += 1;
+                        saveJson(antilinkLogPath, log);
 
-                const count = log[mek.key.remoteJid][mek.key.participant];
+                        const count = log[today][mek.key.remoteJid][mek.key.participant];
 
-                if (count === 2) {
-                  await A17.sendMessage(mek.key.remoteJid, {
-                    text: `⚠️ @${mek.key.participant.split("@")[0]}, kamu sudah 2x melanggar aturan grup karena kirim link. Jika kamu ulangi lagi, kamu akan langsung dikeluarkan.`,
-                    mentions: [mek.key.participant]
-                  });
-                } else if (count >= 3) {
-                  await A17.groupParticipantsUpdate(mek.key.remoteJid, [mek.key.participant], "remove");
-                  console.log(`[ANTILINK] Kick ${mek.key.participant} dari grup ${mek.key.remoteJid}`);
+                        if (count <= 2) {
+                            // Boleh kirim link 2x
+                            console.log(`[ANTILINK] ${mek.key.participant} mengirim link ke-${count} hari ini, masih diperbolehkan.`);
+                        } else if (count <= 4) {
+                            // 3-4x hapus pesannya
+                            await A17.sendMessage(mek.key.remoteJid, { delete: mek.key });
+                            console.log(`[ANTILINK] Hapus link ke-${count} dari ${mek.key.participant}`);
+
+                            if (count === 3) {
+                                await A17.sendMessage(mek.key.remoteJid, {
+                                    text: `⚠️ @${mek.key.participant.split("@")[0]}, kamu sudah mengirim link lebih dari 2x hari ini. Kirim 3x lagi pasti akan Kuterjang🤣!`,
+                                    mentions: [mek.key.participant]
+                                });
+                            }
+                        } else if (count >= 5) {
+                            await A17.sendMessage(mek.key.remoteJid, { delete: mek.key });
+                            console.log(`[ANTILINK] Hapus link ke-${count} dari ${mek.key.participant}`);
+                            await A17.sendMessage(mek.key.remoteJid, {
+                                text: `⚠️ @${mek.key.participant.split("@")[0]}, Kamu Kelawat Batas, Rasakan Ini 😤 Mamam!!!`,
+                                mentions: [mek.key.participant]
+								});
+                            await A17.groupParticipantsUpdate(mek.key.remoteJid, [mek.key.participant], "remove");
+                            console.log(`[ANTILINK] Kick ${mek.key.participant} dari grup ${mek.key.remoteJid} setelah 5x link.`);
+                        }
+
+                    } catch (e) {
+                        console.error("[ANTILINK ERROR]", e.message);
+                    }
+                    return;
                 }
-              } catch (e) {
-                console.error("[ANTILINK ERROR]", e.message);
-              }
-              return;
             }
-          }
         }
-      }
     }
+}
+
 
     if (global.joinall) {
       const messageContent =
