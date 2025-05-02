@@ -20,6 +20,7 @@ console.log = (...args) => {
 const fs = require('fs');
 const path = require('path'); // ⬅️ INI WAJIB ADA
 const pm2 = require('pm2');
+const sharp = require('sharp'); // pastikan di atas
 const { generateGroupBanner } = require('./lib/bannerUtil.js');
 const { uploadFile } = require('./lib/uploadsfile.js');
 const util = require("util");
@@ -692,7 +693,7 @@ LIST FILE:
 ━━━━━━━━━━━━━━━━━━━━
 	${listUpload}
 ━━━━━━━━━━━━━━━━━━━━
-	Thanks To ${BotName}`);
+	Thanks To *_${BotName}_*`);
   } catch (error) {
     console.error('❌ Error saat upload file:', error);
     reply('❌ Terjadi kesalahan saat proses upload.');
@@ -1300,6 +1301,30 @@ case 'setwebsite': {
         reply('❌ Gagal menyimpan website baru.');
     }
 
+    break;
+}
+case 'setemailpass': {
+    if (!isCreator) return reply(mess.botowner);
+    
+    let [email, password] = text.split('|');
+    if (!email || !password) return reply('❌ Format salah!\nContoh: .setemailpass newemail@gmail.com|passwordbaru');
+
+    const path = './config.js'; // Lokasi file config.js kamu
+
+    // Baca file config.js
+    let configContent = fs.readFileSync(path, 'utf8');
+
+    // Ganti global.Email dan global.Pass
+    configContent = configContent
+        .replace(/global\.Email\s*=\s*["'].*?["'];/, `global.Email = "${email}";`)
+        .replace(/global\.Pass\s*=\s*["'].*?["'];/, `global.Pass = "${password}";`);
+
+    // Tulis ulang file config.js
+    fs.writeFileSync(path, configContent, 'utf8');
+	global.Email = email;
+    global.Pass = password;
+    reply(`✅ Email dan Password berhasil diubah!\n\n📧 Email: ${email}\n🔑 Password: ${password}`);
+    
     break;
 }
 
@@ -3138,7 +3163,6 @@ case 'antilink': {
       }
         break;
 
-
 case 'tolink': {
     if (isBan) return reply(mess.banned);
     if (isBanChat) return reply(mess.bangc);
@@ -3147,53 +3171,54 @@ case 'tolink': {
     const quotedMsg = m.quoted || m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const mime = (quotedMsg?.mimetype || "") || m.mimetype || "";
 
-    // Pastikan pesan berisi gambar
-    if (!/image/.test(mime)) return reply('❌ Balas atau tag pesan *gambar* untuk di-upload ke Uguu.se.');
+    if (!/image/.test(mime)) return reply('❌ Balas atau tag pesan *gambar* untuk di-upload ke Catbox.moe.');
 
     let media;
     try {
-        // Mendownload gambar
         media = await A17.downloadMediaMessage(quotedMsg ? m.quoted : m.message, 'buffer');
     } catch (err) {
         console.error('❌ Gagal mendownload media:', err);
-        return reply('❌ Gagal mendownload gambar. Pastikan kamu membalas pesan gambar.');
+        return reply('❌ Gagal mendownload gambar.');
     }
 
-    // Pastikan folder tmp ada, jika belum buat
     const tempFolderPath = './tmp';
     if (!fs.existsSync(tempFolderPath)) {
         fs.mkdirSync(tempFolderPath);
     }
 
-    // Simpan gambar sementara di server
-    const tempFilePath = './tmp/tempImage.jpg';
-    fs.writeFileSync(tempFilePath, media);
+    const originalPath = './tmp/originalImage.jpg';
+    const compressedPath = './tmp/compressedImage.jpg';
 
-    // Upload gambar ke uguu.se
+    fs.writeFileSync(originalPath, media);
+
     try {
-        const formData = new FormData();
-        formData.append('files[]', fs.createReadStream(tempFilePath));
+        // Compress gambar menggunakan sharp
+        await sharp(originalPath)
+            .resize({ width: 1080 }) // Resize jika lebih besar dari 1080px
+            .jpeg({ quality: 75 })   // Turunkan kualitas ke 75%
+            .toFile(compressedPath);
 
-        const response = await axios.post('https://uguu.se/upload?output=json', formData, {
+        const form = new FormData();
+        form.append('fileToUpload', fs.createReadStream(compressedPath));
+        form.append('reqtype', 'fileupload');
+
+        const response = await axios.post('https://catbox.moe/user/api.php', form, {
             headers: {
-                ...formData.getHeaders(),
-            },
+                ...form.getHeaders(),
+            }
         });
 
-        if (response.data && response.data.files && response.data.files[0].url) {
-            const downloadLink = response.data.files[0].url;
-            reply(`✅ Gambar berhasil di-upload ke Uguu.se!\nLink: ${downloadLink}`);
+        if (response.data && typeof response.data === 'string' && response.data.startsWith('https://')) {
+            reply(`✅ Gambar berhasil di-upload ke Catbox!\nLink: ${response.data}`);
         } else {
-            reply('❌ Gagal meng-upload gambar ke Uguu.se.');
+            reply('❌ Gagal upload ke Catbox.');
         }
     } catch (error) {
         console.error(error);
-        reply('❌ Terjadi kesalahan saat meng-upload gambar ke Uguu.se.');
+        reply('❌ Terjadi kesalahan saat upload ke Catbox.');
     }
-
-    // Hapus gambar setelah di-upload
-    fs.unlinkSync(tempFilePath);
-
+    fs.unlinkSync(originalPath);
+    fs.unlinkSync(compressedPath);
     break;
 }
 
@@ -4113,8 +4138,10 @@ const helpexitText = `\nHello ${pushname} Dear...!! ${nowtime} ,
 ⌯ ${prefix}setwebsite
 ⌯ ${prefix}setbanner
 ⌯ ${prefix}setqris
+⌯ ${prefix}setqrislink
 ⌯ ${prefix}setjpm
 ⌯ ${prefix}setgruplink
+⌯ ${prefix}setemailpass
 ⌯ ${prefix}promosi
 ⌯ ${prefix}banpromosi
 ⌯ ${prefix}banallpromosi

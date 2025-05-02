@@ -7,7 +7,7 @@ require("dotenv").config();
 global.available = process.env.AVAILABLE || true;
 global.autoReadAll = process.env.AUTO_READ_ALL || false;
 global.antitags = process.env.ANTITAGS || true;
-global.joinall = process.env.JOINALL || true;
+global.joinall = process.env.JOINALL || false;
 
 // Auto functioner
 global.autoTyping = process.env.AUTO_TYPING || false;
@@ -18,35 +18,35 @@ global.autoreadgc = process.env.AUTOREADGC || true;
 
 
 // Auth information
-global.pairNumber = "XXXX";                         // Add your paining number with country code example "6282326322300"; 
+global.pairNumber = "6285929880376";                         // Add your paining number with country code example "6282326322300"; 
 global.port = process.env.PORT || "10000";
 global.auth = process.env.AUTH || "Pairing";                // Auth mode OR/Pairing.
 global.sessionFile = process.env.SESSION_FILE || "A17-SESSION";
 global.mongodb = process.env.MONGODB || "";                 // Mongodb url.
-global.website = "https://wa.me/6285161256106"; 
+global.website = "https://chat.whatsapp.com/Cr6h5QNpO8dGWtx9rxG59J"; 
 global.github = "https://github.com/Diah082";
 
 
 // Default prefix
-global.prefa = process.env.PREFIX ? process.env.PREFIX.split(".") : ["."];
+global.prefa = process.env.PREFIX ? process.env.PREFIX.split(".") : [","];
 
 
 // Owner information
-global.Owner = process.env.OWNER ? process.env.OWNER.split(",") : ["6285161256106"];
-global.OwnerNumber = process.env.OWNER_NUMBER ? process.env.OWNER_NUMBER.split(",") : ["6285161256106"];
-global.ownertag = process.env.OWNER_TAG ? process.env.OWNER_TAG.split(",") : ["6285161256106"];
-global.OwnerName = process.env.OWNER_NAME || "SPS";
-global.BotName = process.env.BOT_NAME || "SPS";
-global.packname = process.env.PACK_NAME || "SPS Bot";
-global.author = "By: SPS";
-global.BotSourceCode = "https://github.com/Diah082/Nebot";
-global.SupportGroupLink = "https://chat.whatsapp.com/Jo9QobvI8Ge2LdFVNL6Mlp";
-global.GroupLink = "https://chat.whatsapp.com/Jo9QobvI8Ge2LdFVNL6Mlp";
-global.Qris = "https://h.uguu.se/BcYJmeNf.jpg";
-global.Email = "newbiestore09@gmail.com"; // Ganti dengan email kamu
-global.Pass = "Elma1234!!"; // Ganti dengan password kamu
+global.Owner = process.env.OWNER ? process.env.OWNER.split(",") : ["6282326322300"];
+global.OwnerNumber = process.env.OWNER_NUMBER ? process.env.OWNER_NUMBER.split(",") : ["6282326322300"];
+global.ownertag = process.env.OWNER_TAG ? process.env.OWNER_TAG.split(",") : ["6282326322300"];
+global.OwnerName = process.env.OWNER_NAME || "Newbie";
+global.BotName = process.env.BOT_NAME || "Newbie-Store";
+global.packname = process.env.PACK_NAME || "NEWBIE Bot";
+global.author = "By: Newbie";
+global.BotSourceCode = "https://github.com/Diah082/NewbieBot";
+global.GroupLink = "https://chat.whatsapp.com/Cr6h5QNpO8dGWtx9rxG59J";
+global.Qris = "https://files.catbox.moe/sn69bk.jpg";
+global.Email = "Pusatdata10@gmail.com"; // Ganti dengan email kamu
+global.Pass = "De26122010"; // Ganti dengan password kamu
 
-/
+//
+global.openAiAPI = process.env.OPENAI_API || "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";
 global.location = process.env.LOCATION || "Center Java, Indonesia";
 global.reactmoji = process.env.REACT_MOJI || "❤️";
 global.themeemoji = process.env.THEME_EMOJI || "💖";
@@ -55,7 +55,7 @@ global.vidmenu = { url: process.env.VID_MENU_URL || 'https://telegra.ph/file/ae1
 
 //
 global.BotLogo = fs.readFileSync("./Assets/pic1.jpg");
-global.Thumb = "https://f.uguu.se/NUKLzsGL.jpg";
+global.Thumb = "https://files.catbox.moe/ogjri0.jpg";
 global.Thumb1 = fs.readFileSync("./Assets/pic5.jpg");
 global.ErrorPic = fs.readFileSync("./Assets/pic7.jpg");
 global.them = "https://r4.wallpaperflare.com/wallpaper/1003/376/845/makoto-shinkai-kimi-no-na-wa-wallpaper-0816ade8b0301c58302c014e48d2441a.jpg";
