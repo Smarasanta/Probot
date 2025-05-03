@@ -41,7 +41,7 @@ global.packname = process.env.PACK_NAME || "PROM Bot";
 global.author = "By: Newbie";
 global.BotSourceCode = "https://github.com/Diah082/NewbieBot";
 global.GroupLink = "https://chat.whatsapp.com/F3ozw6NWQi01yVNprxGtHr";
-global.Qris = "https://files.catbox.moe/sn69bk.jpg";
+global.Qris = "https://raw.githubusercontent.com/Smarasanta/Assets/main/QR.jpg";
 global.Email = "Pusatdata10@gmail.com"; // Ganti dengan email kamu
 global.Pass = "De26122010"; // Ganti dengan password kamu
 
