@@ -23,7 +23,7 @@ global.port = process.env.PORT || "10000";
 global.auth = process.env.AUTH || "Pairing";                // Auth mode OR/Pairing.
 global.sessionFile = process.env.SESSION_FILE || "A17-SESSION";
 global.mongodb = process.env.MONGODB || "";                 // Mongodb url.
-global.website = "https://chat.whatsapp.com/Cr6h5QNpO8dGWtx9rxG59J"; 
+global.website = "https://chat.whatsapp.com/F3ozw6NWQi01yVNprxGtHr"; 
 global.github = "https://github.com/Diah082";
 
 
@@ -32,15 +32,15 @@ global.prefa = process.env.PREFIX ? process.env.PREFIX.split(".") : [","];
 
 
 // Owner information
-global.Owner = process.env.OWNER ? process.env.OWNER.split(",") : ["6282326322300"];
-global.OwnerNumber = process.env.OWNER_NUMBER ? process.env.OWNER_NUMBER.split(",") : ["6282326322300"];
-global.ownertag = process.env.OWNER_TAG ? process.env.OWNER_TAG.split(",") : ["6282326322300"];
-global.OwnerName = process.env.OWNER_NAME || "Newbie";
-global.BotName = process.env.BOT_NAME || "Newbie-Store";
-global.packname = process.env.PACK_NAME || "NEWBIE Bot";
+global.Owner = process.env.OWNER ? process.env.OWNER.split(",") : ["6285161256106"];
+global.OwnerNumber = process.env.OWNER_NUMBER ? process.env.OWNER_NUMBER.split(",") : ["6285161256106"];
+global.ownertag = process.env.OWNER_TAG ? process.env.OWNER_TAG.split(",") : ["6285161256106"];
+global.OwnerName = process.env.OWNER_NAME || "SabdoPalon";
+global.BotName = process.env.BOT_NAME || "SabdoPalon-Store";
+global.packname = process.env.PACK_NAME || "PROM Bot";
 global.author = "By: Newbie";
 global.BotSourceCode = "https://github.com/Diah082/NewbieBot";
-global.GroupLink = "https://chat.whatsapp.com/Cr6h5QNpO8dGWtx9rxG59J";
+global.GroupLink = "https://chat.whatsapp.com/F3ozw6NWQi01yVNprxGtHr";
 global.Qris = "https://files.catbox.moe/sn69bk.jpg";
 global.Email = "Pusatdata10@gmail.com"; // Ganti dengan email kamu
 global.Pass = "De26122010"; // Ganti dengan password kamu
