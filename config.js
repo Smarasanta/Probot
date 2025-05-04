@@ -42,8 +42,8 @@ global.author = "By: Newbie";
 global.BotSourceCode = "https://github.com/Diah082/NewbieBot";
 global.GroupLink = "https://chat.whatsapp.com/F3ozw6NWQi01yVNprxGtHr";
 global.Qris = "https://raw.githubusercontent.com/Smarasanta/Assets/main/QR.jpg";
-global.Email = "Pusatdata10@gmail.com"; // Ganti dengan email kamu
-global.Pass = "De26122010"; // Ganti dengan password kamu
+global.Email = "gfa01086@gmail.com"; // Ganti dengan email kamu
+global.Pass = "Sabdo1Kece"; // Ganti dengan password kamu
 
 //
 global.openAiAPI = process.env.OPENAI_API || "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";
