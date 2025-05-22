@@ -18,14 +18,14 @@ global.autoreadgc = process.env.AUTOREADGC || true;
 
 
 // Auth information
-global.pairNumber = "6282313716106";                         // Add your paining number with country code example "6282326322300"; 
+global.pairNumber = "XXXX";                         // Add your paining number with country code example "6282326322300"; 
 global.port = process.env.PORT || "10000";
 global.auth = process.env.AUTH || "Pairing";                // Auth mode OR/Pairing.
 global.sessionFile = process.env.SESSION_FILE || "A17-SESSION";
 global.mongodb = process.env.MONGODB || "";                 // Mongodb url.
 global.website = "https://chat.whatsapp.com/F3ozw6NWQi01yVNprxGtHr"; 
 global.github = "https://github.com/Diah082";
-
+global.token_do = "sfjkdbsjbkdjsb";
 
 // Default prefix
 global.prefa = process.env.PREFIX ? process.env.PREFIX.split(".") : [","];

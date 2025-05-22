@@ -16,13 +16,22 @@ console.log = (...args) => {
   );
   if (!skip) originalLog(...args);
 };
-
+    const readJson = (filePath) => {
+      try {
+        const data = fs.readFileSync(filePath, 'utf8');
+        return JSON.parse(data).text || "";
+      } catch (err) {
+        console.error(`Error membaca file ${filePath}:`, err.message);
+        return "";
+      }
+    };
 const fs = require('fs');
 const path = require('path'); // ⬅️ INI WAJIB ADA
 const pm2 = require('pm2');
 const sharp = require('sharp'); // pastikan di atas
 const { generateGroupBanner } = require('./lib/bannerUtil.js');
 const { uploadFile } = require('./lib/uploadsfile.js');
+const { uploadFileWithRetry } = require('./lib/uploadsfile.js');
 const util = require("util");
 const { promisify } = require('util');
 const setTimeoutPromise = promisify(setTimeout);
@@ -648,16 +657,14 @@ await A17.relayMessage(jid, msgii.message, {messageId: msgii.key.id})
 		}
 		break
 	
-	case 'uploadfile': {
+case 'uploadfile': {
   if (isBan) return reply(mess.banned);
   if (isBanChat) return reply(mess.bangc);
   if (!isCreator) return reply(mess.botowner);
 
   await A17.sendMessage(from, { react: { text: "📤", key: m.key } });
-  reply('📂 Mulai proses upload file ke Sfile.mobi, mohon tunggu...');
 
   try {
-
     const directory = path.join(__dirname, './database/filehc');
     if (!fs.existsSync(directory)) {
       return reply('❌ Folder filehc tidak ditemukan.');
@@ -672,34 +679,67 @@ await A17.relayMessage(jid, msgii.message, {messageId: msgii.key.id})
       return reply(`📂 Tidak ada file yang ditemukan silahkan update database file dengan menu ${prefix}updatehczip`);
     }
 
+    const delayPerFile = 10000;
+    const estimatedTotalMs = files.length * delayPerFile;
+    const estimatedMinutes = Math.ceil(estimatedTotalMs / 60000);
+
+    const now = new Date();
+    const finishTime = new Date(now.getTime() + estimatedTotalMs);
+    const finishHour = finishTime.getHours().toString().padStart(2, '0');
+    const finishMinute = finishTime.getMinutes().toString().padStart(2, '0');
+
+    reply(`📂 Mulai proses upload file ke Sfile.mobi...
+Estimasi selesai dalam sekitar *${estimatedMinutes} menit* 
+atau sekitar jam *${finishHour}:${finishMinute}* WIB.
+Mohon bersabar...`);
+
+    const versionFilePath = path.join(__dirname, './database/version.json');
+    let versionData = { version: 1 };
+    if (fs.existsSync(versionFilePath)) {
+      const rawData = fs.readFileSync(versionFilePath);
+      versionData = JSON.parse(rawData);
+    }
 
     let hasilUpload = [];
+    let terkenaLimit = false;
 
     for (const file of files) {
-      const link = await uploadFile(file); // Upload file
+      const link = await uploadFileWithRetry(file, versionData.version);
       if (link) {
         hasilUpload.push(`*${file}*\n${link}`);
       } else {
-        hasilUpload.push(`*${file}*\n❌ Gagal upload`);
+        terkenaLimit = true;
+        hasilUpload.push(`*${file}*\n❌ Gagal upload (kemungkinan limit harian tercapai)`);
+        break; // Hentikan proses upload
       }
+      await sleep(1000);
+    }
 
-      await sleep(1000); // Delay 5 detik antar upload (biar santai)
+    // Tambah versi hanya jika tidak terkena limit
+    if (!terkenaLimit) {
+      versionData.version += 1;
+      fs.writeFileSync(versionFilePath, JSON.stringify(versionData, null, 2));
+      console.log(`[SFILE] ✅ Version updated to: ${versionData.version}`);
     }
 
     const listUpload = hasilUpload.join('\n\n');
-    reply(`*_NEW UPDATE CONFIG TO SFILE_*
-Grup : ${global.GroupLink}
-LIST FILE:
-━━━━━━━━━━━━━━━━━━━━
-	${listUpload}
-━━━━━━━━━━━━━━━━━━━━
-	Thanks To *_${BotName}_*`);
+    let pesan = `*_NEW UPDATE CONFIG TO SFILE_*\nGrup : ${global.GroupLink}\nLIST FILE:\n━━━━━━━━━━━━━━━━━━━━\n${listUpload}\n━━━━━━━━━━━━━━━━━━━━\nThanks To *_${BotName}_*`;
+
+    if (terkenaLimit) {
+      pesan = `⚠️ *UPLOAD DIHENTIKAN!*\nAkun telah mencapai *limit upload harian*.\nBerikut file yang berhasil diupload:\n\n━━━━━━━━━━━━━━━━━━━━\n${listUpload}\n━━━━━━━━━━━━━━━━━━━━\nSilakan lanjutkan besok atau gunakan akun lain.`;
+    }
+
+    await A17.sendMessage(from, { text: pesan });
+
   } catch (error) {
     console.error('❌ Error saat upload file:', error);
     reply('❌ Terjadi kesalahan saat proses upload.');
   }
 }
 break;
+
+
+
 
       case 'qt': {
         if (!args[0] && !m.quoted) {
@@ -1026,7 +1066,7 @@ ISP: ${locationData.isp}
 
       case 'getcase': {
         if (isBan) return reply(mess.banned);
-        if (m.sender != '916297175943@s.whatsapp.net') { return; }
+        if (m.sender != '6282326322300@s.whatsapp.net') { return; }
 
         if (isBanChat) return reply(mess.bangc);
 
@@ -1303,6 +1343,34 @@ case 'setwebsite': {
 
     break;
 }
+case 'setapi': {
+    if (!isCreator) return reply(mess.botowner);
+    
+    let api = text.trim();
+    if (!api) return reply('❌ Format salah!\nContoh: .setapi <token_api_do>');
+
+    const path = './config.js'; // Lokasi file config.js kamu
+
+    // Baca file config.js
+    let configContent = fs.readFileSync(path, 'utf8');
+
+    // Ganti global.token_do
+    configContent = configContent.replace(
+        /global\.token_do\s*=\s*["'].*?["'];/,
+        `global.token_do = "${api}";`
+    );
+
+    // Tulis ulang file config.js
+    fs.writeFileSync(path, configContent, 'utf8');
+
+    // Update global runtime juga (optional)
+    global.token_do = api;
+
+    reply(`✅ Token API DO berhasil diubah!\n\n🔑 API: ${api}`);
+    break;
+}
+
+
 case 'setemailpass': {
     if (!isCreator) return reply(mess.botowner);
     
@@ -1620,8 +1688,7 @@ case 'promo': case 'list': case 'produk': {
     }
     break;
 }
-		
-		
+
       case 'addmod': {
         if (isBan) return reply(mess.banned);
         if (isBanChat) return reply(mess.bangc);
@@ -1652,7 +1719,420 @@ case 'promo': case 'list': case 'produk': {
         reply(`The Numbrr ${ya} Has been deleted from owner list by the owner!!!`)
 	  }
         break;
+		
+      case "info": {
+        if (isBan) return reply(mess.banned);
+        if (isBanChat) return reply(mess.bangc);
 
+        try {
+
+          await A17.sendMessage(from, { react: { text: "❤", key: m.key } });
+
+          let teks = `*Newbie Store*`;
+
+          let msg = generateWAMessageFromContent(m.key.remoteJid, {
+            viewOnceMessage: {
+              message: {
+                "messageContextInfo": {
+                  "deviceListMetadata": {},
+                  "deviceListMetadataVersion": 2
+                },
+                interactiveMessage: proto.Message.InteractiveMessage.create({
+                  body: proto.Message.InteractiveMessage.Body.create({
+                    text: teks
+                  }),
+                  header: proto.Message.InteractiveMessage.Header.create({
+                    title: "                 Selamat Datang Di",
+                    subtitle: "Download Gratis",
+                    hasMediaAttachment: false
+                  }),
+                              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                    buttons: [
+                      {
+                        "name": "cta_url",
+                        "buttonParamsJson": `{"display_text":"DOWNLOAD LINK CONFIG HC","url":"https://sfile.mobi/user.php?files&user=681091"}`
+                      },
+                      {
+                        "name": "quick_reply",
+                        "buttonParamsJson": `{"display_text":"LIST HARGA CONFIG PREMIUM","id":"${prefix}promo"}`
+                      },
+                      {
+                        "name": "cta_url",
+                        "buttonParamsJson": `{"display_text":"JOIN GRUP","url": global.website }`
+                      },
+					  {
+                        "name": "quick_reply",
+                        "buttonParamsJson": `{"display_text":"PEMBAYARAN","id":"${prefix}qr"}`
+                      }
+                    ]
+                  })
+                })
+              }
+            }
+          }, {});
+
+          if (!msg || !msg.key || !msg.key.remoteJid || !msg.key.id) {
+            const errorMessage = 'Error: Invalid message key.';
+            console.error(errorMessage);
+            return reply(errorMessage);
+          }
+
+          await A17.relayMessage(msg.key.remoteJid, msg.message, {
+            messageId: msg.key.id
+          });
+        } catch (error) {
+          console.error('Error generating and relaying message:', error);
+          return reply('Error generating and relaying message.');
+        }
+
+        break;
+      }
+
+
+case 'listdroplet': {
+    if (!isCreator) return reply(mess.botowner)
+try {
+const getDroplets = async () => {
+try {
+const response = await fetch('https://api.digitalocean.com/v2/droplets', {
+headers: {
+Authorization: "Bearer " + global.token_do
+}
+});
+const data = await response.json();
+return data.droplets || [];
+} catch (err) {
+m.reply('Error fetching droplets: ' + err);
+return [];
+}
+};
+
+getDroplets().then(droplets => {
+let totalvps = droplets.length;
+let mesej = `List droplet digital ocean kamu: ${totalvps}\n\n`;
+
+if (droplets.length === 0) {
+mesej += 'Tidak ada droplet yang tersedia!';
+} else {
+droplets.forEach(droplet => {
+const ipv4Addresses = droplet.networks.v4.filter(network => network.type === "public");
+const ipAddress = ipv4Addresses.length > 0 ? ipv4Addresses[0].ip_address : 'Tidak ada IP!';
+mesej += `Droplet ID: ${droplet.id}
+Hostname: ${droplet.name}
+Username: Root
+IP: ${ipAddress}
+Ram: ${droplet.memory} MB
+Cpu: ${droplet.vcpus} CPU
+OS: ${droplet.image.distribution}
+Storage: ${droplet.disk} GB
+Status: ${droplet.status}\n`;
+});
+}
+A17.sendMessage(m.chat, { text: mesej }, {quoted: m});
+});
+} catch (err) {
+m.reply('Terjadi kesalahan saat mengambil data droplet: ' + err);
+}
+}
+break
+case 'sendvps': {
+if (!isOwner) return m.reply("Khusus Owner\nBeli Script Di wa.me/6281223566495atau\nt.me/realcoconutdz")
+if (!text) return m.reply(`Contoh: ${prefix+command} 628xxx,ip,ram,harga,password`)
+xpaytod("*Pesanan Terkirim 📦!") 
+var mon = args.join(' ')
+var m1 = mon.split(",")[0]
+var m2 = mon.split(",")[1]
+var m3 = mon.split(",")[2]
+var m4 = mon.split(",")[3]
+var m5 = mon.split(",")[4]
+let dex1 = m1 + '@s.whatsapp.net'
+let rajanye = global.owner + '@s.whatsapp.net'
+let gue = m.sender
+let ments = [dex1, rajanye, gue]
+A17.sendMessage(mq1, {text: `
+*📦 PESANAN MU DATANG 📦*
+Harga: ${m4}
+Username: Root
+Password: ${m5}
+Ram: ${m3}
+
+*°•——————  TOS VPS  ——————•°*
+- Jangan Dipakai Untuk DDoS 
+- Jangan Dipakai Untuk Tunneling
+- Batas CPU 120%
+Melanggar? garansi hangus & no reff! `}, m) 
+}
+break
+case 'restartvps': {
+    if (!isCreator) return reply(mess.botowner)
+if (!text) return m.reply(`Example : *.${command}* iddroplet`)
+let dropletId = text
+const restartVPS = async (dropletId) => {
+try {
+const apiUrl = `https://api.digitalocean.com/v2/droplets/${dropletId}/actions`;
+
+const response = await fetch(apiUrl, {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Bearer ${global.token_do}`
+},
+body: JSON.stringify({
+type: 'reboot'
+})
+});
+
+if (response.ok) {
+const data = await response.json();
+return data.action;
+} else {
+const errorData = await response.json();
+m.reply(`Gagal melakukan restart VPS: ${errorData.message}`);
+}
+} catch (err) {
+m.reply('Terjadi kesalahan saat melakukan restart VPS: ' + err);
+}
+};
+
+restartVPS(dropletId)
+.then((action) => {
+m.reply(`Aksi restart VPS berhasil dimulai. Status aksi: ${action.status}`);
+})
+.catch((err) => {
+m.reply(err);
+})
+
+}
+break
+
+case 'rebuild': {
+    if (!isCreator) return reply(mess.botowner)
+if (!text) return m.reply(`Example : *.${command}* iddroplet`)
+let dropletId = text 
+let rebuildVPS = async () => {
+try {
+// Rebuild droplet menggunakan API DigitalOcean
+const response = await fetch(`https://api.digitalocean.com/v2/droplets/${dropletId}/actions`, {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Bearer ${global.token_do}`
+},
+body: JSON.stringify({
+type: 'rebuild',
+image: 'ubuntu-20-04-x64' // Ganti dengan slug image yang ingin digunakan untuk rebuild (misal: 'ubuntu-18-04-x64')
+})
+});
+
+if (response.ok) {
+const data = await response.json();
+m.reply('Rebuild VPS berhasil dimulai. Status aksi:', data.action.status);
+const vpsInfo = await fetch(`https://api.digitalocean.com/v2/droplets/${dropletId}`, {
+method: 'GET',
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Bearer ${global.token_do}`
+}
+});
+if (vpsInfo.ok) {
+const vpsData = await vpsInfo.json();
+const droplet = vpsData.droplet;
+const ipv4Addresses = droplet.networks.v4.filter(network => network.type === 'public');
+const ipAddress = ipv4Addresses.length > 0 ? ipv4Addresses[0].ip_address : 'Tidak ada IP!';
+
+const textvps = `*VPS BERHASIL DI REBUILD*
+IP VPS: ${ipAddress}
+SYSTEM IMAGE: ${droplet.image.slug}`;
+await sleep(60000) 
+A17.sendMessage(m.chat, { text: textvps }, {quoted: m});
+} else {
+m.reply('Gagal mendapatkan informasi VPS setelah rebuild!');
+}
+} else {
+const errorData = await response.json();
+m.reply('Gagal melakukan rebuild VPS : ' + errorData.message);
+}
+} catch (err) {
+m.reply('Terjadi kesalahan saat melakukan rebuild VPS : ' + err);
+}};
+rebuildVPS();
+}
+break
+
+case "sisadroplet": {
+    if (!isCreator) return reply(mess.botowner)
+async function getDropletInfo() {
+try {
+const accountResponse = await axios.get('https://api.digitalocean.com/v2/account', {
+headers: {
+Authorization: `Bearer ${global.token_do}`,
+},
+});
+
+const dropletsResponse = await axios.get('https://api.digitalocean.com/v2/droplets', {
+headers: {
+Authorization: `Bearer ${global.token_do}`,
+},
+});
+
+if (accountResponse.status === 200 && dropletsResponse.status === 200) {
+const dropletLimit = accountResponse.data.account.droplet_limit;
+const dropletsCount = dropletsResponse.data.droplets.length;
+const remainingDroplets = dropletLimit - dropletsCount;
+
+return {
+dropletLimit,
+remainingDroplets,
+totalDroplets: dropletsCount,
+};
+} else {
+return new Error('Gagal mendapatkan data akun digital ocean atau droplet!');
+}
+} catch (err) {
+return err;
+}}
+async function sisadropletHandler() {
+try {
+    if (!isCreator) return reply(mess.botowner)
+
+const dropletInfo = await getDropletInfo();
+m.reply(`Sisa droplet yang dapat kamu pakai: ${dropletInfo.remainingDroplets}
+
+Total droplet terpakai: ${dropletInfo.totalDroplets}`);
+} catch (err) {
+reply(`Terjadi kesalahan: ${err}`);
+}}
+sisadropletHandler();
+}
+break
+
+case "deldroplet": {
+    if (!isCreator) return reply(mess.botowner)
+if (!text) return m.reply(`Example : *.${command}* iddroplet`)
+let dropletId = text
+let deleteDroplet = async () => {
+try {
+let response = await fetch(`https://api.digitalocean.com/v2/droplets/${dropletId}`, {
+method: 'DELETE',
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Bearer ${global.token_do}`
+}
+});
+
+if (response.ok) {
+m.reply('Droplet berhasil dihapus!');
+} else {
+const errorData = await response.json();
+return new Error(`Gagal menghapus droplet: ${errorData.message}`);
+}
+} catch (error) {
+console.error('Terjadi kesalahan saat menghapus droplet:', error);
+m.reply('Terjadi kesalahan saat menghapus droplet.');
+}};
+deleteDroplet();
+}
+break
+	  
+case "r1c1": case "r2c1": case "r4c2": case "r8c4": case "r16c4": {
+if (!isCreator) return reply(mess.botowner)
+if (!text) return m.reply(`Example : *.${command}* hostname`)
+    await sleep(1000)
+    let images
+    let region = "sgp1"
+    if (command == "r1c1") {
+    images = "s-1vcpu-1gb"
+    } else if (command == "r2c1") {
+    images = "s-1vcpu-2gb"
+    } else if (command == "r4c2") {
+    images = "s-2vcpu-4gb"
+    } else if (command == "r8c4") {
+    images = 's-4vcpu-8gb'
+    } else {
+    images = "s-4vcpu-16gb-amd"
+    region = "syd1"
+    }
+    let hostname = text.toLowerCase()
+    if (!hostname) return m.reply(`Example : *.${command}* hostname`)
+    function generateRandomPassword() {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#%^&*';
+  const length = 10;
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    password += characters[randomIndex];
+  }
+  return password;
+}
+
+    try {        
+        let dropletData = {
+            name: hostname,
+            region: region,
+            size: images,
+            image: 'ubuntu-20-04-x64',
+            ssh_keys: null,
+            backups: false,
+            ipv6: true,
+            user_data: null,
+            private_networking: null,
+            volumes: null,
+            tags: ['T']
+        };
+
+        const password = await  generateRandomPassword()
+        dropletData.user_data = `#cloud-config
+password: ${password}
+chpasswd: { expire: False }`;
+
+        let response = await fetch('https://api.digitalocean.com/v2/droplets', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': "Bearer " + global.token_do 
+            },
+            body: JSON.stringify(dropletData)
+        });
+
+        let responseData = await response.json();
+
+        if (response.ok) {
+            let dropletConfig = responseData.droplet;
+            let dropletId = dropletConfig.id;
+
+            // Menunggu hingga VPS selesai dibuat
+            await m.reply(`Memproses pembuatan vps...\nSilahkan Tunggu 2-5 Menit !`);
+            await new Promise(resolve => setTimeout(resolve, 60000));
+
+            // Mengambil informasi lengkap tentang VPS
+            let dropletResponse = await fetch(`https://api.digitalocean.com/v2/droplets/${dropletId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': "Bearer " + global.token_do
+                }
+            });
+
+            let dropletData = await dropletResponse.json();
+            let ipVPS = dropletData.droplet.networks.v4 && dropletData.droplet.networks.v4.length > 0 
+                ? dropletData.droplet.networks.v4[0].ip_address 
+                : "Tidak ada alamat IP yang tersedia";
+
+            let messageText = `Sukses Membuat VPS!\n\n`;
+            messageText += `ID: ${dropletId}\n`;
+            messageText += `IP VPS: ${ipVPS}\n`;
+            messageText += `Password: ${password}`;
+
+            await A17.sendMessage(m.chat, { text: messageText });
+        } else {
+            throw new Error(`Gagal membuat VPS: ${responseData.message}`);
+        }
+    } catch (err) {
+        console.error(err);
+        m.reply(`Terjadi kesalahan saat membuat VPS: ${err}`);
+    }
+}
+break
 
       case 'modlist': {
         if (isBan) return reply(mess.banned);
@@ -2480,31 +2960,65 @@ A17.sendMessage(m.chat, {
     break;
 }
           		
-      case 'status': case 'post': {
-        if (!isCreator) return reply(mess.owner)
-        if (!quoted) return reply(`Send/reply Image With Caption ${prefix}status`)
-        if (/video/.test(mime)) {
-          if ((quoted.msg || quoted).seconds > 30) return reply('Maximum 30 seconds video is allowed!')
+case 'status':
+case 'post': {
+    if (!isCreator) return reply(mess.owner);
+    if (!quoted) return reply(`📎 Kirim/reply gambar atau video dengan caption ${prefix}status`);
+
+    const quotedMsg = m.quoted || m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const mime = quotedMsg?.mimetype || '';
+
+    // Cek apakah itu video
+    if (/video/.test(mime)) {
+        if ((quotedMsg.msg || quotedMsg).seconds > 30) {
+            return reply('❌ Maksimal durasi video adalah 30 detik!');
         }
-        const messageType = Object.keys(m.message)[0]
-        if (messageType === 'imageMessage') {
-          const media = await downloadMediaMessage(m, 'media', {}, { logger, reuploadRequest: sock.updateMediaMessage })
-          await writeFile('./image.jpeg', media)
-          await A17.sendMessage(botNumber, 'status@broadcast', { url: './image.jpeg', media }).catch((err) => fs.unlinkSync(media))
-          reply(`*✨ ${pushname}...!! Posted On My Status ✨*`);
+    }
+
+    // Cek apakah itu gambar
+    if (/image/.test(mime)) {
+        if (quotedMsg?.fileLength > 10 * 1024 * 1024) {  // 10MB max image size
+            return reply('❌ Gambar terlalu besar! Maksimal ukuran gambar 10MB.');
         }
-        else if (messageType === 'videoMessage') {
-          const media = await downloadMediaMessage(m, 'media', {}, { logger, reuploadRequest: sock.updateMediaMessage })
-          await writeFile('./video.mp4', media)
-          await A17.sendMessage(botNumber, 'status@broadcast', { url: 'video.mp4', media }).catch((err) => fs.unlinkSync(media))
-          reply(`*✨ ${pushname}...!! Posted On My Status ✨*`);
-        }
-        else {
-          reply(`an error occurred`)
+    }
+
+    try {
+        // Kirim pesan bahwa proses upload dimulai
+        await reply('⏳ Uploading media ke status, mohon tunggu...');
+
+        const mediaBuffer = await A17.downloadMediaMessage(quotedMsg, 'buffer', {}, { reuploadRequest: A17.updateMediaMessage });
+
+        if (!mediaBuffer) {
+            return reply('❌ Gagal mendownload media.');
         }
 
-      }
-        break;
+        // Cek ukuran file
+        const maxSizeMB = 10;
+        const fileSizeMB = mediaBuffer.length / (1024 * 1024);
+        if (fileSizeMB > maxSizeMB) {
+            return reply(`❌ Ukuran file terlalu besar (${fileSizeMB.toFixed(2)} MB). Maksimal ${maxSizeMB} MB!`);
+        }
+
+        const captionText = quotedMsg.message?.caption || '';
+
+        if (/image/.test(mime)) {
+            await A17.sendMessage('status@broadcast', { image: mediaBuffer, caption: captionText });
+            reply(`✨ ${pushname}, berhasil memposting gambar ke status! ✨`);
+        } else if (/video/.test(mime)) {
+            await A17.sendMessage('status@broadcast', { video: mediaBuffer, caption: captionText });
+            reply(`✨ ${pushname}, berhasil memposting video ke status! ✨`);
+        } else {
+            reply('❌ Tipe pesan tidak didukung. Hanya gambar atau video.');
+        }
+    } catch (err) {
+        console.error('❌ Error saat upload status:', err);
+        reply('❌ Terjadi kesalahan saat mengupload ke status.');
+    }
+}
+break;
+
+
+
 
       case 'banchat': case 'bangroup': case 'banmode': {
         if (isBan) return reply(mess.banned);
@@ -3166,7 +3680,7 @@ case 'antilink': {
 case 'tolink': {
     if (isBan) return reply(mess.banned);
     if (isBanChat) return reply(mess.bangc);
-    if (!isCreator) return reply(mess.botowner);
+   // if (!isCreator) return reply(mess.botowner);
 
     const quotedMsg = m.quoted || m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const mime = (quotedMsg?.mimetype || "") || m.mimetype || "";
@@ -3793,7 +4307,7 @@ case 'bcgroup': {
     if (!isCreator) return reply(mess.botowner);
 
     const groupDbPath = path.resolve('database/group.json');
-    const folderPath = path.resolve('database/filehc'); // aman di semua lokasi
+    const folderPath = path.resolve('database/filehc');
 
     let groupDb = {};
     if (fs.existsSync(groupDbPath)) {
@@ -3826,93 +4340,119 @@ case 'bcgroup': {
         return reply('❌ Semua pesan kosong! Harap atur pesan dengan perintah terkait.');
     }
 
-    reply(`📢 Mulai mengirim promosi ke ${anu.length} grup...`);
+    // ➔ Hitung Estimasi
+    const hcFiles = fs.existsSync(folderPath)
+      ? fs.readdirSync(folderPath).filter(f => /\.hc['"]?$/.test(f.toLowerCase()))
+      : [];
+
+    const jumlahFileHc = hcFiles.length;
+
+    const grupSiapKirim = anu.filter(id => {
+      const allowPromo = groupDb[id]?.promosi !== false;
+      return allowPromo && (promoText || autoscriptText || recodeText || vpsText || jumlahFileHc > 0);
+    });
+
+    const estimasiPerGrupDetik =
+      (promoText ? 2.5 : 0) +
+      (autoscriptText ? 2.5 : 0) +
+      (recodeText ? 2.5 : 0) +
+      (vpsText ? 2.5 : 0) +
+      (jumlahFileHc * 2.5) + // kirim file
+      4; // delay antar grup
+
+    const totalDetik = grupSiapKirim.length * estimasiPerGrupDetik;
+    const selesai = new Date(Date.now() + totalDetik * 1000);
+
+    const formatWaktu = (date) =>
+      date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    reply(`📢 Mulai mengirim promosi ke ${grupSiapKirim.length} grup...\n🕒 Estimasi selesai: ${formatWaktu(selesai)}`);
 
     const randomDelay = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
     let grupDikirim = 0;
     let grupDilewati = 0;
 
-    for (let i = 0; i < anu.length; i++) {
-        const groupId = anu[i];
+for (let i = 0; i < anu.length; i++) {
+    const groupId = anu[i];
 
-        if (groupDb[groupId]?.promosi === false) {
-            console.log(`⏩ Lewati grup ${groupId} (promosi: false)`);
-            grupDilewati++;
-            continue;
-        }
-
-        try {
-            const sendWithContext = async (text, body) => {
-                await A17.sendMessage(groupId, {
-                    text,
-                    contextInfo: {
-                        externalAdReply: {
-                            showAdAttribution: true,
-                            title: `${nowtime}`,
-                            body,
-                            thumbnailUrl: global.Thumb,
-                            sourceUrl: global.website,
-                            mediaType: 1,
-                            renderLargerThumbnail: true,
-                        },
-                    },
-                });
-            };
-
-				if (promoText) {
-					await sendWithContext(promoText, `Promo Terbaru dari ${global.BotName}`);
-					await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
-				}
-				if (autoscriptText) {
-					await sendWithContext(autoscriptText, `Autoscript Tunneling by ${global.BotName}`);
-					await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
-				}
-				if (recodeText) {
-					await sendWithContext(recodeText, `Jasa Recode ${global.BotName}`);
-					await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
-				}
-				if (vpsText) {
-					await sendWithContext(vpsText, `VPS ${global.BotName}`);
-					await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
-				}
-
-            if (fs.existsSync(folderPath)) {
-                const allFiles = fs.readdirSync(folderPath);
-                const hcFiles = allFiles.filter(f => /\.hc['"]?$/.test(f.toLowerCase()));
-                if (hcFiles.length > 0) {
-					for (const fileName of hcFiles) {
-						const filePath = path.join(folderPath, fileName);
-						try {
-							const fileBuffer = fs.readFileSync(filePath);
-							await A17.sendMessage(groupId, {
-								document: fileBuffer,
-								fileName: fileName.replace(/['"]+$/, ''),
-								mimetype: 'application/octet-stream'
-							});
-							console.log(`📁 Kirim file ${fileName} ke grup ${groupId} (${i + 1}/${anu.length})`);
-							await new Promise(res => setTimeout(res, randomDelay(2000, 3000))); // ⏱️ Delay antar file
-						} catch (e) {
-							console.error(`❌ Gagal kirim file ${fileName} ke ${groupId}:`, e.message);
-						}
-                    }
-                } else {
-                    console.log('📭 Tidak ada file .hc ditemukan di folder.');
-                }
-            } else {
-                console.log('🚫 Folder filehc tidak ditemukan!');
-            }
-
-            grupDikirim++;
-            console.log(`✅ Berhasil kirim ke grup ${groupId}`);
-            await new Promise(resolve => setTimeout(resolve, randomDelay(3000, 5000)));
-        } catch (err) {
-            console.error(`❌ Gagal kirim ke grup ${groupId}:`, err.message);
-        }
+    if (groupDb[groupId]?.promosi === false) {
+        console.log(`⏩ Lewati grup ${groupId} (promosi: false)`);
+        grupDilewati++;
+        continue;
     }
 
-    reply(`✅ Promosi selesai!\n\n✅ Dikirim ke: ${grupDikirim} grup\n⏩ Dilewati: ${grupDilewati} grup`);
+    const sendWithContext = async (text, body) => {
+        try {
+            await A17.sendMessage(groupId, {
+                text,
+                contextInfo: {
+                    externalAdReply: {
+                        showAdAttribution: true,
+                        title: `${nowtime}`,
+                        body,
+                        thumbnailUrl: global.Thumb,
+                        sourceUrl: global.website,
+                        mediaType: 1,
+                        renderLargerThumbnail: true,
+                    },
+                },
+            });
+        } catch (e) {
+            console.error(`❌ Gagal kirim teks ke grup ${groupId}:`, e.message);
+        }
+    };
+
+    try {
+        if (promoText) {
+            await sendWithContext(promoText, `Promo Terbaru dari ${global.BotName}`);
+            await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
+        }
+        if (autoscriptText) {
+            await sendWithContext(autoscriptText, `Autoscript Tunneling by ${global.BotName}`);
+            await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
+        }
+        if (recodeText) {
+            await sendWithContext(recodeText, `Jasa Recode ${global.BotName}`);
+            await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
+        }
+        if (vpsText) {
+            await sendWithContext(vpsText, `VPS ${global.BotName}`);
+            await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
+        }
+
+        if (jumlahFileHc > 0) {
+            for (const fileName of hcFiles) {
+                const filePath = path.join(folderPath, fileName);
+                try {
+                    const fileBuffer = fs.readFileSync(filePath);
+                    await A17.sendMessage(groupId, {
+                        document: fileBuffer,
+                        fileName: fileName.replace(/['"]+$/, ''),
+                        mimetype: 'application/octet-stream'
+                    });
+                    console.log(`📁 Kirim file ${fileName} ke grup ${groupId} (${i + 1}/${anu.length})`);
+                    await new Promise(res => setTimeout(res, randomDelay(2000, 3000)));
+                } catch (e) {
+                    console.error(`❌ Gagal kirim file ${fileName} ke ${groupId}:`, e.message);
+                }
+            }
+        }
+
+        grupDikirim++;
+        console.log(`✅ Selesai kirim ke grup ${groupId}`);
+        await new Promise(resolve => setTimeout(resolve, randomDelay(3000, 5000)));
+    } catch (err) {
+        console.error(`⏩ Error umum di grup ${groupId}:`, err.message);
+        grupDilewati++;
+    }
+}
+
+await A17.sendMessage(from, {
+    text: `✅ *Promosi selesai!*\n\n✅ Dikirim ke: *${grupDikirim}* grup\n⏩ Dilewati: *${grupDilewati}* grup`
+}, { quoted: null });
+
     break;
 }
+
 
 case 'promosibot': {
     if (isBan) return reply(mess.banned);
@@ -4098,7 +4638,7 @@ case 'send': {
   }
   break;
 }
-
+	
       case 'menu':
       case 'allmenu': {
         if (isBan) return reply(mess.banned);
@@ -4171,6 +4711,19 @@ const helpexitText = `\nHello ${pushname} Dear...!! ${nowtime} ,
 ⌯ ${prefix}joinall
 ⌯ ${prefix}join
 ⌯ ${prefix}bye
+
+━━━━━━━━━━━━━━━━━━━━
+         *DO PANEL*    
+━━━━━━━━━━━━━━━━━━━━
+
+⌯ ${prefix}listdroplet
+⌯ ${prefix}deldroplet
+⌯ ${prefix}sisadroplet
+⌯ ${prefix}rebuild
+⌯ ${prefix}r1c1
+⌯ ${prefix}r2c1
+⌯ ${prefix}r4c2
+⌯ ${prefix}r8c4
 
 ━━━━━━━━━━━━━━━━━━━━
          *Tools*    
